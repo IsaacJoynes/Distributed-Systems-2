@@ -13,12 +13,14 @@ public class ContentServer {
     private String filePath;
     private LamportClock clock;
 
+    // Initializes URL, path, and Lamport clock
     public ContentServer(String serverUrl, String filePath) {
         this.serverUrl = serverUrl;
         this.filePath = filePath;
         this.clock = new LamportClock();
     }
 
+    // Starts the content server and sends weather data
     public void start() {
         try {
             JSONObject weatherData = readWeatherDataFromFile();
@@ -28,6 +30,7 @@ public class ContentServer {
         }
     }
 
+    // Reads weather data from the specified file
     private JSONObject readWeatherDataFromFile() throws Exception {
         JSONObject weatherData = new JSONObject();
         try (BufferedReader reader = new BufferedReader(new FileReader(filePath))) {
@@ -42,8 +45,9 @@ public class ContentServer {
         return weatherData;
     }
 
+    // Sends a PUT request with weather data
     private void sendPutRequest(JSONObject weatherData) throws Exception {
-        clock.tick(); // Increment before sending
+        clock.tick();
         long currentClock = clock.getValue();
 
         URL url = new URL(serverUrl + "/weather.json");
@@ -62,9 +66,11 @@ public class ContentServer {
             System.out.println("Sent data: " + weatherData.toString());
         }
 
+        // Get the response code from the server
         int responseCode = conn.getResponseCode();
         System.out.println("PUT Response Code: " + responseCode);
 
+        // Print the response body
         if (responseCode >= 200 && responseCode < 300) {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                 String line;
@@ -75,6 +81,7 @@ public class ContentServer {
                 System.out.println("Response body: " + response.toString());
             }
         } else {
+            // Print the error response
             try (BufferedReader errorReader = new BufferedReader(new InputStreamReader(conn.getErrorStream()))) {
                 StringBuilder errorResponse = new StringBuilder();
                 String line;
@@ -84,16 +91,18 @@ public class ContentServer {
                 System.out.println("Error response: " + errorResponse.toString());
             }
         }
+
+        // Update Lamport clock
         String serverClockStr = conn.getHeaderField("Lamport-Clock");
         if (serverClockStr != null) {
             long serverClock = Long.parseLong(serverClockStr);
             clock.update(serverClock);
         }
-        // conn.disconnect();
-        // clock.tick();
+
         System.out.println("Local Lamport clock after request: " + clock.getValue());
     }
 
+    // Main method
     public static void main(String[] args) {
         if (args.length != 2) {
             System.out.println("Usage: java ContentServer <server_url> <file_path>");

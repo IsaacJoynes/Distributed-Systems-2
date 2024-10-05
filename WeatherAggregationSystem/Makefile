@@ -6,10 +6,10 @@ JAVAC = javac
 JAVA = java
 CP = -cp "$(LIBS);$(OUT_DIR)"
 
-# Java source files
+# Source files
 SOURCES = $(wildcard $(SRC_DIR)/com/weather/*.java)
 
-# Default target (compile all Java files)
+# (compile all Java files)
 all: $(OUT_DIR)/com/weather/AggregationServer.class $(OUT_DIR)/com/weather/ContentServer.class $(OUT_DIR)/com/weather/GETClient.class
 
 # Compile the Java files

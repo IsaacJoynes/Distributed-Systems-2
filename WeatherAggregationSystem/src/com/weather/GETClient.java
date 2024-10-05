@@ -11,12 +11,14 @@ public class GETClient {
     private String stationId;
     private LamportClock clock;
 
+    // Initialise the URL, ID, and Lamport clock
     public GETClient(String serverUrl, String stationId) {
         this.serverUrl = serverUrl;
         this.stationId = stationId;
         this.clock = new LamportClock();
     }
 
+    // Starts the GET request
     public void start() {
         try {
             JSONObject weatherData = sendGetRequest();
@@ -26,15 +28,18 @@ public class GETClient {
         }
     }
 
+    // Sends a GET request to retrieve data
     private JSONObject sendGetRequest() throws Exception {
         URL url = new URL(serverUrl + "/weather.json" + (stationId != null ? "?id=" + stationId : ""));
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("GET");
         conn.setRequestProperty("Lamport-Clock", String.valueOf(clock.getValue()));
 
+        // Get the response code from the server
         int responseCode = conn.getResponseCode();
         System.out.println("GET Response Code: " + responseCode);
 
+        // Read the response
         if (responseCode == HttpURLConnection.HTTP_OK) {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(conn.getInputStream()))) {
                 StringBuilder response = new StringBuilder();
@@ -49,6 +54,7 @@ public class GETClient {
         return null;
     }
 
+    // Displays data in the console
     private void displayWeatherData(JSONObject weatherData) {
         if (weatherData != null) {
             for (String key : weatherData.keySet()) {
@@ -59,6 +65,7 @@ public class GETClient {
         }
     }
 
+    // Main method
     public static void main(String[] args) {
         if (args.length < 1 || args.length > 2) {
             System.out.println("Usage: java GETClient <server_url> [station_id]");
