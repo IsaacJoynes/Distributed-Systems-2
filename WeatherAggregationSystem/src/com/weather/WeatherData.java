@@ -21,4 +21,10 @@ public class WeatherData {
     public String toString() {
         return data.toString();
     }
+
+    // Optional: Static method to create a WeatherData instance from a JSON string
+    public static WeatherData fromJson(String json) {
+        JSONObject jsonObject = new JSONObject(json);
+        return new WeatherData(jsonObject);
+    }
 }
