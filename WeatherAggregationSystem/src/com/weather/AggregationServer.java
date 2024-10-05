@@ -1,3 +1,4 @@
+package WeatherAggregationSystem.src.com.weather;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.ConcurrentHashMap;

@@ -1,3 +1,4 @@
+package WeatherAggregationSystem.src.com.weather;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.OutputStreamWriter;
