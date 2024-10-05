@@ -94,6 +94,7 @@ public class AggregationServer {
                             if (line.startsWith("Lamport-Clock:")) {
                                 try {
                                     clientLamportClock = Long.parseLong(line.split(":")[1].trim());
+                                    lamportClock.update(clientLamportClock);
                                 } catch (NumberFormatException e) {
                                     System.out.println("Invalid Lamport-Clock value: " + line);
                                 }
@@ -102,15 +103,19 @@ public class AggregationServer {
                         }
 
                         System.out.println("Client Lamport clock: " + clientLamportClock);
+                        System.out.println("Server Lamport clock after update: " + lamportClock.getValue());
 
                         if ("GET".equalsIgnoreCase(method)) {
-                            handleGetRequest(path, clientLamportClock, out);
+                            handleGetRequest(path, lamportClock.getValue(), out);
                         } else if ("PUT".equalsIgnoreCase(method)) {
-                            handlePutRequest(in, clientLamportClock, out);
+                            handlePutRequest(in, lamportClock.getValue(), out);
                         } else {
                             System.out.println("Unsupported method: " + method);
                             out.println("HTTP/1.1 400 Bad Request");
                         }
+
+                        lamportClock.tick();
+                        System.out.println("Server Lamport clock after tick: " + lamportClock.getValue());
                     }
                 }
             } catch (Exception e) {

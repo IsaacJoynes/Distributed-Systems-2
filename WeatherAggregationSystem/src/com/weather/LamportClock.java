@@ -7,15 +7,15 @@ public class LamportClock {
         this.value = 0;
     }
 
+    public synchronized long getValue() {
+        return value;
+    }
+
     public synchronized void tick() {
         value++;
     }
 
-    public synchronized void update(long receivedTimestamp) {
-        value = Math.max(value, receivedTimestamp) + 1;
-    }
-
-    public synchronized long getValue() {
-        return value;
+    public synchronized void update(long receivedValue) {
+        value = Math.max(value, receivedValue) + 1;
     }
 }

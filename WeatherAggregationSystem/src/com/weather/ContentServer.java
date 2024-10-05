@@ -43,6 +43,9 @@ public class ContentServer {
     }
 
     private void sendPutRequest(JSONObject weatherData) throws Exception {
+        clock.tick(); // Increment before sending
+        long currentClock = clock.getValue();
+
         URL url = new URL(serverUrl + "/weather.json");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("PUT");
@@ -81,9 +84,14 @@ public class ContentServer {
                 System.out.println("Error response: " + errorResponse.toString());
             }
         }
-
-        conn.disconnect();
-        clock.tick();
+        String serverClockStr = conn.getHeaderField("Lamport-Clock");
+        if (serverClockStr != null) {
+            long serverClock = Long.parseLong(serverClockStr);
+            clock.update(serverClock);
+        }
+        // conn.disconnect();
+        // clock.tick();
+        System.out.println("Local Lamport clock after request: " + clock.getValue());
     }
 
     public static void main(String[] args) {
