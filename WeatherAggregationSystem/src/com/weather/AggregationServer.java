@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 import org.json.JSONObject;
 
 public class AggregationServer {
@@ -62,86 +63,122 @@ public class AggregationServer {
         int port = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_PORT;
         new AggregationServer(port).start();
     }
-}
 
-class ClientHandler implements Runnable {
-    private Socket clientSocket;
-    private AggregationServer server;
+    class ClientHandler implements Runnable {
+        private Socket clientSocket;
+        private AggregationServer server;
 
-    public ClientHandler(Socket socket, AggregationServer server) {
-        this.clientSocket = socket;
-        this.server = server;
-    }
+        public ClientHandler(Socket socket, AggregationServer server) {
+            this.clientSocket = socket;
+            this.server = server;
+        }
 
-    @Override
-    public void run() {
-        try (
-                BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
-            System.out.println("New client connected: " + clientSocket.getInetAddress());
+        @Override
+        public void run() {
+            try (
+                    BufferedReader in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                    PrintWriter out = new PrintWriter(clientSocket.getOutputStream(), true)) {
+                String inputLine = in.readLine();
+                System.out.println("Received request: " + inputLine);
 
-            String inputLine = in.readLine();
-            System.out.println("Received request: " + inputLine);
+                if (inputLine != null) {
+                    String[] parts = inputLine.split(" ");
+                    if (parts.length >= 2) {
+                        String method = parts[0];
+                        String path = parts[1];
 
-            if (inputLine != null) {
-                String[] parts = inputLine.split(" ");
-                if (parts.length >= 2) {
-                    String method = parts[0];
-                    String path = parts[1];
-                    long clientLamportClock = Long.parseLong(in.readLine());
+                        // Read headers
+                        String line;
+                        long clientLamportClock = 0;
+                        while ((line = in.readLine()) != null && !line.isEmpty()) {
+                            if (line.startsWith("Lamport-Clock:")) {
+                                try {
+                                    clientLamportClock = Long.parseLong(line.split(":")[1].trim());
+                                } catch (NumberFormatException e) {
+                                    System.out.println("Invalid Lamport-Clock value: " + line);
+                                }
+                                break;
+                            }
+                        }
 
-                    System.out.println("Client Lamport clock: " + clientLamportClock);
+                        System.out.println("Client Lamport clock: " + clientLamportClock);
 
-                    if ("GET".equalsIgnoreCase(method)) {
-                        handleGetRequest(path, clientLamportClock, out);
-                    } else if ("PUT".equalsIgnoreCase(method)) {
-                        handlePutRequest(in, clientLamportClock, out);
-                    } else {
-                        System.out.println("Unsupported method: " + method);
-                        out.println("HTTP/1.1 400 Bad Request");
+                        if ("GET".equalsIgnoreCase(method)) {
+                            handleGetRequest(path, clientLamportClock, out);
+                        } else if ("PUT".equalsIgnoreCase(method)) {
+                            handlePutRequest(in, clientLamportClock, out);
+                        } else {
+                            System.out.println("Unsupported method: " + method);
+                            out.println("HTTP/1.1 400 Bad Request");
+                        }
                     }
                 }
+            } catch (Exception e) {
+                System.out.println("Error handling client: " + e.getMessage());
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            System.out.println("Error handling client: " + e.getMessage());
-            e.printStackTrace();
         }
-    }
 
-    private void handleGetRequest(String path, long clientLamportClock, PrintWriter out) {
-        String stationId = path.substring(path.lastIndexOf('/') + 1);
-        WeatherData data = server.getWeatherData(stationId, clientLamportClock);
-        if (data != null) {
+        private void handleGetRequest(String path, long clientLamportClock, PrintWriter out) {
+            String stationId = null;
+            if (path.contains("?id=")) {
+                stationId = path.substring(path.lastIndexOf('=') + 1);
+            }
+
+            JSONObject responseData = new JSONObject();
+            if (stationId != null) {
+                WeatherData data = server.getWeatherData(stationId, clientLamportClock);
+                if (data != null) {
+                    responseData = data.getData();
+                }
+            } else {
+                for (Map.Entry<String, WeatherData> entry : server.weatherDataMap.entrySet()) {
+                    responseData.put(entry.getKey(), entry.getValue().getData());
+                }
+            }
+
+            if (!responseData.isEmpty()) {
+                out.println("HTTP/1.1 200 OK");
+                out.println("Content-Type: application/json");
+                out.println();
+                out.println(responseData.toString());
+            } else {
+                out.println("HTTP/1.1 404 Not Found");
+            }
+        }
+
+        private void handlePutRequest(BufferedReader in, long clientLamportClock, PrintWriter out) throws Exception {
+            StringBuilder payload = new StringBuilder();
+            String line;
+            int contentLength = 0;
+
+            // Read headers to find Content-Length
+            while ((line = in.readLine()) != null && !line.isEmpty()) {
+                if (line.startsWith("Content-Length:")) {
+                    contentLength = Integer.parseInt(line.split(":")[1].trim());
+                }
+            }
+
+            // Read the request body
+            if (contentLength > 0) {
+                char[] buffer = new char[contentLength];
+                in.read(buffer, 0, contentLength);
+                payload.append(buffer);
+            }
+
+            // Parse the payload as JSON
+            JSONObject jsonData = new JSONObject(payload.toString());
+            String stationId = jsonData.getString("id");
+            WeatherData weatherData = new WeatherData(jsonData);
+
+            // Update the weather data
+            server.updateWeatherData(stationId, weatherData, clientLamportClock);
+
+            // Respond to the client
             out.println("HTTP/1.1 200 OK");
             out.println("Content-Type: application/json");
             out.println();
-            out.println(data.toString());
-        } else {
-            out.println("HTTP/1.1 404 Not Found");
+            out.println("{\"status\": \"success\"}");
         }
-    }
-
-    private void handlePutRequest(BufferedReader in, long clientLamportClock, PrintWriter out) throws Exception {
-        StringBuilder payload = new StringBuilder();
-        String line;
-
-        // Read the request body
-        while ((line = in.readLine()) != null && !line.isEmpty()) {
-            payload.append(line);
-        }
-
-        // Parse the payload as JSON
-        JSONObject jsonData = new JSONObject(payload.toString());
-        String stationId = jsonData.getString("id");
-        WeatherData weatherData = new WeatherData(jsonData);
-
-        // Update the weather data
-        server.updateWeatherData(stationId, weatherData, clientLamportClock);
-
-        // Respond to the client
-        out.println("HTTP/1.1 200 OK");
-        out.println("Content-Type: application/json");
-        out.println();
-        out.println("{\"status\": \"success\"}");
     }
 }

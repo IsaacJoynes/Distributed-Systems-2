@@ -5,7 +5,6 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import org.json.JSONObject;
-import com.weather.LamportClock;
 
 public class GETClient {
     private String serverUrl;
@@ -43,7 +42,7 @@ public class GETClient {
                 while ((line = reader.readLine()) != null) {
                     response.append(line);
                 }
-                clock.tick(); // Increment Lamport clock after receiving
+                clock.tick();
                 return new JSONObject(response.toString());
             }
         }
